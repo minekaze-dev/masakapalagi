@@ -1,8 +1,12 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
+// Mengambil Kunci API dari environment variables yang disediakan oleh platform hosting (seperti Vercel).
+// Pastikan Anda telah mengatur environment variable dengan nama 'API_KEY'.
 const API_KEY = process.env.API_KEY;
+
+// Cek apakah API_KEY sudah tersedia. Jika tidak, fungsionalitas AI tidak akan berjalan.
 if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+  console.error("Kunci API Gemini tidak ditemukan. Harap pastikan environment variable 'API_KEY' sudah diatur di Vercel atau platform hosting Anda.");
 }
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -37,6 +41,9 @@ const recipeSchema = {
 };
 
 export const generateRecipes = async (ingredients: string[]) => {
+  if (!API_KEY) {
+      throw new Error("Kunci API Gemini belum dikonfigurasi. Pastikan environment variable 'API_KEY' sudah diatur.");
+  }
   const prompt = `
     Anda adalah seorang chef ahli dan food stylist dengan spesialisasi mengubah bahan sisa menjadi hidangan istimewa yang terlihat lezat.
     Tolong berikan TEPAT 3 (TIGA) variasi resep masakan yang berbeda, terlihat, dan terdengar sangat lezat menggunakan bahan-bahan utama berikut: ${ingredients.join(', ')}.
@@ -65,6 +72,9 @@ export const generateRecipes = async (ingredients: string[]) => {
 };
 
 export const askChefAI = async (question: string): Promise<string> => {
+  if (!API_KEY) {
+      return "Maaf, Kunci API Gemini belum dikonfigurasi. Saya tidak dapat menjawab pertanyaan Anda saat ini.";
+  }
   const prompt = `
     Anda adalah ChefAI, seorang pakar kuliner virtual yang ramah, membantu, dan sangat berpengetahuan.
     Misi Anda adalah membantu pengguna dengan segala hal yang berkaitan dengan dunia masak-memasak.
@@ -92,6 +102,11 @@ export const askChefAI = async (question: string): Promise<string> => {
 
 
 export const generateImage = async (prompt: string): Promise<string> => {
+  if (!API_KEY) {
+    console.warn('API Key is not set, falling back to Unsplash.');
+    return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
+  }
+
   const fullPrompt = `A delicious, professional, photorealistic food photograph of: ${prompt}. Centered, high resolution, vibrant colors, appetizing.`;
   try {
     const response = await ai.models.generateContent({

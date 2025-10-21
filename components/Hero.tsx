@@ -13,7 +13,7 @@ export const Hero: React.FC<HeroProps> = ({ ingredients, setIngredients, onGener
 
   const suggestions = [
     'telur', 'kecap manis', 'nasi', 'bawang merah', 
-    'ayam', 'wortel', 'tahu', 'tempe', 'santan', 'cabe rawit'
+    'ayam', 'wortel', 'tahu', 'tempe', 'santan', 'cabe rawit', 'daun bawang', 'margarin'
   ];
 
   const handleAddIngredient = (ingredient: string) => {
