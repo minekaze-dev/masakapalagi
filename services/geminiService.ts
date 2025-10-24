@@ -1,4 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { supabase } from './supabase';
+import { v4 as uuidv4 } from 'uuid';
+import type { Recipe } from '../types';
 
 // Mengambil Kunci API dari environment variables yang disediakan oleh platform hosting (seperti Vercel).
 // Pastikan Anda telah mengatur environment variable dengan nama 'API_KEY'.
@@ -40,7 +43,70 @@ const recipeSchema = {
   }
 };
 
-export const generateRecipes = async (ingredients: string[]) => {
+// Helper function to decode base64 and create a Blob
+function base64ToBlob(base64: string, contentType: string = 'image/jpeg'): Blob {
+  const byteCharacters = atob(base64);
+  const byteArrays = [];
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, { type: contentType });
+}
+
+const generateAndStoreImage = async (prompt: string): Promise<string> => {
+  if (!API_KEY) {
+    console.warn('API Key is not set, falling back to Unsplash for image storage.');
+    return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
+  }
+
+  const fullPrompt = `A delicious, professional, photorealistic food photograph of: ${prompt}. Centered, high resolution, vibrant colors, appetizing, studio lighting.`;
+  
+  const response = await ai.models.generateImages({
+    model: 'imagen-4.0-generate-001',
+    prompt: fullPrompt,
+    config: {
+      numberOfImages: 1,
+      outputMimeType: 'image/jpeg',
+      aspectRatio: '4:3',
+    },
+  });
+
+  const image = response.generatedImages?.[0]?.image;
+
+  if (image?.imageBytes) {
+    const base64ImageBytes: string = image.imageBytes;
+    const imageBlob = base64ToBlob(base64ImageBytes, 'image/jpeg');
+    const fileName = `${uuidv4()}.jpeg`;
+    
+    // Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from('recipe-images')
+      .upload(fileName, imageBlob);
+
+    if (error) {
+      console.error('Error uploading image to Supabase:', error);
+      throw error;
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('recipe-images')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  }
+  
+  throw new Error('No image data found in Gemini response.');
+};
+
+
+export const generateRecipes = async (ingredients: string[]): Promise<Recipe[]> => {
   if (!API_KEY) {
       throw new Error("Kunci API Gemini belum dikonfigurasi. Pastikan environment variable 'API_KEY' sudah diatur.");
   }
@@ -64,7 +130,19 @@ export const generateRecipes = async (ingredients: string[]) => {
     });
 
     const jsonText = response.text.trim();
-    return JSON.parse(jsonText);
+    const recipes: Recipe[] = JSON.parse(jsonText);
+
+    const recipesWithImages = await Promise.all(recipes.map(async (recipe) => {
+      try {
+        const imageUrl = await generateAndStoreImage(recipe.imageKeywords);
+        return { ...recipe, imageUrl };
+      } catch (imageError) {
+        console.error(`Gagal membuat gambar untuk "${recipe.recipeName}". Menggunakan gambar pengganti.`, imageError);
+        return { ...recipe, imageUrl: `https://source.unsplash.com/400x250/?${encodeURIComponent(recipe.imageKeywords)}` };
+      }
+    }));
+
+    return recipesWithImages;
   } catch (error) {
     console.error("Error generating recipes:", error);
     throw new Error("Failed to generate recipes. The model might be overloaded. Please try again later.");
@@ -97,40 +175,5 @@ export const askChefAI = async (question: string): Promise<string> => {
   } catch (error) {
       console.error("Error asking Chef AI:", error);
       throw new Error("Gagal mendapatkan jawaban dari Chef AI. Coba lagi beberapa saat.");
-  }
-};
-
-
-export const generateImage = async (prompt: string): Promise<string> => {
-  if (!API_KEY) {
-    console.warn('API Key is not set, falling back to Unsplash.');
-    return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
-  }
-
-  const fullPrompt = `A delicious, professional, photorealistic food photograph of: ${prompt}. Centered, high resolution, vibrant colors, appetizing, studio lighting.`;
-  try {
-    const response = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001',
-      prompt: fullPrompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '4:3',
-      },
-    });
-
-    const image = response.generatedImages?.[0]?.image;
-
-    if (image?.imageBytes) {
-      const base64ImageBytes: string = image.imageBytes;
-      return `data:image/jpeg;base64,${base64ImageBytes}`;
-    }
-    
-    console.warn('No image data found in Gemini response, falling back to Unsplash.');
-    return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
-
-  } catch (error) {
-    console.error(`Error generating image for prompt "${prompt}":`, error);
-    return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
   }
 };
