@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Mengambil Kunci API dari environment variables yang disediakan oleh platform hosting (seperti Vercel).
 // Pastikan Anda telah mengatur environment variable dengan nama 'API_KEY'.
@@ -107,23 +107,23 @@ export const generateImage = async (prompt: string): Promise<string> => {
     return `https://source.unsplash.com/400x250/?${encodeURIComponent(prompt)}`;
   }
 
-  const fullPrompt = `A delicious, professional, photorealistic food photograph of: ${prompt}. Centered, high resolution, vibrant colors, appetizing.`;
+  const fullPrompt = `A delicious, professional, photorealistic food photograph of: ${prompt}. Centered, high resolution, vibrant colors, appetizing, studio lighting.`;
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: fullPrompt }],
-      },
+    const response = await ai.models.generateImages({
+      model: 'imagen-4.0-generate-001',
+      prompt: fullPrompt,
       config: {
-        responseModalities: [Modality.IMAGE],
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '4:3',
       },
     });
 
-    const part = response?.candidates?.[0]?.content?.parts?.[0];
+    const image = response.generatedImages?.[0]?.image;
 
-    if (part?.inlineData) {
-      const base64ImageBytes: string = part.inlineData.data;
-      return `data:image/png;base64,${base64ImageBytes}`;
+    if (image?.imageBytes) {
+      const base64ImageBytes: string = image.imageBytes;
+      return `data:image/jpeg;base64,${base64ImageBytes}`;
     }
     
     console.warn('No image data found in Gemini response, falling back to Unsplash.');
