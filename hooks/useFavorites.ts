@@ -41,7 +41,6 @@ export const useFavorites = () => {
           ingredients: item.ingredients,
           instructions: item.instructions,
           imageKeywords: item.image_keywords,
-          imageUrl: item.image_url,
         }));
         setFavorites(mappedData);
       }
@@ -83,7 +82,6 @@ export const useFavorites = () => {
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
           image_keywords: recipe.imageKeywords,
-          image_url: recipe.imageUrl,
         }]);
 
       if (error) {

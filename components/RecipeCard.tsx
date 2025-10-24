@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Recipe } from '../types';
 import { ClockIcon, DifficultyBarsIcon, UtensilsIcon, XIcon, StarIcon } from './icons/Icons';
+import { generateImage } from '../services/geminiService';
 import { useFavorites } from '../hooks/useFavorites';
 
 interface RecipeCardProps {
@@ -11,17 +12,34 @@ interface RecipeCardProps {
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onCookNow, index }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
   const favorited = isFavorite(recipe.recipeName);
-
-  const imageUrl = recipe.imageUrl || '';
-  const isImageLoading = !imageUrl;
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), index * 100);
     return () => clearTimeout(timer);
   }, [index]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchImage = async () => {
+      setIsImageLoading(true);
+      const url = await generateImage(recipe.imageKeywords);
+      if (isMounted) {
+        setImageUrl(url);
+        setIsImageLoading(false);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recipe.imageKeywords]);
 
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();

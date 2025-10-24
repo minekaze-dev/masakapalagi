@@ -6,7 +6,6 @@ export interface Recipe {
   ingredients: string[];
   instructions: string[];
   imageKeywords: string;
-  imageUrl?: string;
 }
 
 export enum Page {
